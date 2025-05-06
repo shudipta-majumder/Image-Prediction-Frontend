@@ -22,7 +22,7 @@ const MAX_FILE_SIZE_MB = 1; // Maximum allowed file size in MB
 
 // Yup validation schema for image
 const imageSchema = yup
-  .mixed()
+  .mixed<File>()
   .required("Image is required")
   .test(
     "fileSize",
