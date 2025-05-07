@@ -18,9 +18,8 @@ const CLASSES = [
   "truck",
 ];
 
-const MAX_FILE_SIZE_MB = 1; // Maximum allowed file size in MB
+const MAX_FILE_SIZE_MB = 1;
 
-// Yup validation schema for image
 const imageSchema = yup
   .mixed<File>()
   .required("Image is required")
@@ -49,6 +48,8 @@ const Page = () => {
     confidence: number;
   } | null>(null);
 
+  const [imageLink, setImageLink] = useState<string>("");
+
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (file) {
@@ -57,11 +58,12 @@ const Page = () => {
         setFileError(null);
         setSelectedImage(URL.createObjectURL(file));
         setImageFile(file);
+        setImageLink(""); // clear link if file selected
       } catch (err: any) {
         setFileError(err.message);
         setSelectedImage(null);
         setImageFile(null);
-        toast.error(err.message); // toast error for file validation
+        toast.error(err.message);
       }
     }
   }, []);
@@ -76,6 +78,42 @@ const Page = () => {
     accept: acceptImages,
     multiple: false,
   });
+
+  const handleImageLinkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setImageLink(e.target.value);
+  };
+
+  const handleUseLink = async () => {
+    if (!imageLink) {
+      toast.error("Please provide an image link.");
+      return;
+    }
+
+    try {
+      // Validate image link by attempting to fetch it
+      const res = await fetch(imageLink);
+      const blob = await res.blob();
+
+      if (!blob.type.startsWith("image/")) {
+        throw new Error("Provided link is not an image.");
+      }
+
+      const file = new File([blob], "uploaded_image_from_link.jpg", {
+        type: blob.type,
+      });
+
+      await imageSchema.validate(file);
+
+      setSelectedImage(imageLink);
+      setImageFile(file);
+      setFileError(null);
+
+      toast.success("Image link loaded successfully!");
+    } catch (err: any) {
+      setFileError(err.message);
+      toast.error(err.message);
+    }
+  };
 
   const handlePredict = async () => {
     if (!imageFile) {
@@ -118,21 +156,28 @@ const Page = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 p-8 flex flex-col items-center">
-      {/* Toast Container */}
       <Toaster position="top-center" reverseOrder={false} />
 
       <h1 className="text-4xl font-extrabold bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 bg-clip-text text-transparent mb-4">
         AI Image Prediction
       </h1>
-      <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 w-full max-w-md rounded">
-        You can only predict below classes:
-        <ul className="list-disc ml-5 mt-2">
+
+      {/* Class info */}
+      <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700 p-3 mb-4 w-full max-w-md rounded text-sm">
+        <p className="font-medium">You can only predict below classes:</p>
+        <ul className="flex flex-wrap gap-2 mt-2">
           {CLASSES.map((cls) => (
-            <li key={cls}>{cls}</li>
+            <li
+              key={cls}
+              className="bg-yellow-100 border border-yellow-300 rounded px-2 py-1 text-xs"
+            >
+              {cls}
+            </li>
           ))}
         </ul>
       </div>
 
+      {/* File Upload */}
       <div
         {...getRootProps()}
         className={`w-full max-w-md p-6 border-2 border-dashed rounded cursor-pointer ${
@@ -153,15 +198,36 @@ const Page = () => {
         )}
       </div>
 
+      {/* Image Link Upload */}
+      <div className="mt-4 w-full max-w-md">
+        <label className="block mb-2 font-medium text-gray-700">
+          Or paste Image Link
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={imageLink}
+            onChange={handleImageLinkChange}
+            placeholder="https://example.com/image.jpg"
+            className="flex-1 p-2 border rounded bg-white focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            onClick={handleUseLink}
+            className=" bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition transform hover:scale-105"
+          >
+            Use Link
+          </button>
+        </div>
+      </div>
+
       {fileError && (
         <div className="mt-4 text-red-600 text-sm">
           <p>{fileError}</p>
         </div>
       )}
 
-      {/* Image & Prediction Result Side by Side */}
+      {/* Image & Prediction Result */}
       <div className="mt-6 flex flex-col md:flex-row items-center md:items-start gap-6 w-full max-w-md">
-        {/* Image */}
         {selectedImage ? (
           <img
             src={selectedImage}
@@ -174,7 +240,6 @@ const Page = () => {
           </div>
         )}
 
-        {/* Prediction Result */}
         <div className="bg-white rounded-lg shadow p-4 border w-full">
           <h2 className="text-lg font-semibold mb-2 text-gray-700">
             Prediction
@@ -218,11 +283,12 @@ const Page = () => {
       {/* Predict Button */}
       <button
         onClick={handlePredict}
-        className="mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded"
+        className="mt-6 bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition transform hover:scale-105"
       >
         {correctLabel ? "Predict & Train" : "Predict"}
       </button>
-      <footer className="mt-10 text-xs text-gray-500 text-center">
+
+      <footer className="mt-25 text-xs text-gray-500 text-center">
         © {new Date().getFullYear()} — We trust your train misclassified data.
         After a month period train all misclassified data with scheduler
         automatically.
